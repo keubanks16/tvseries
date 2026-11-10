@@ -50,12 +50,13 @@ nav .badge{font-size:10px;background:var(--panel2);border-radius:9px;padding:0 6
 .ov{font-size:13.5px;color:#c9cede;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;
   -webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
 .ov.open{-webkit-line-clamp:unset}
-.acts{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.acts{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
 .acts button{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;
-  padding:9px 4px;font-size:13px;cursor:pointer}
+  padding:10px 1px;font-size:12.5px;cursor:pointer;white-space:nowrap}
 .acts button.on[data-s=liked]{background:var(--good);border-color:var(--good);color:#04130b;font-weight:600}
 .acts button.on[data-s=seen]{background:var(--seen);border-color:var(--seen);color:#04101f;font-weight:600}
 .acts button.on[data-s=disliked]{background:var(--bad);border-color:var(--bad);color:#1f0505;font-weight:600}
+.acts button.on[data-s=pass]{background:var(--dim);border-color:var(--dim);color:#0e1016;font-weight:600}
 .acts2{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .acts2 button{border-radius:10px;padding:10px 4px;font-size:14px;cursor:pointer;border:1px solid var(--line);
   background:var(--panel2);color:var(--text)}
@@ -79,7 +80,7 @@ textarea{min-height:90px;font-size:12px}
 .btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line);font-weight:500}
 .btn.wide{width:100%;margin-top:8px}
 .seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:3px;margin-bottom:12px}
-.seg button{flex:1;background:none;border:0;color:var(--dim);padding:9px 2px;border-radius:8px;font-size:13.5px;cursor:pointer}
+.seg button{flex:1;background:none;border:0;color:var(--dim);padding:9px 1px;border-radius:8px;font-size:12.5px;cursor:pointer;white-space:nowrap}
 .seg button.on{background:var(--panel2);color:var(--text);font-weight:600}
 .empty{text-align:center;color:var(--dim);padding:36px 18px;font-size:15px}
 .empty big{display:block;font-size:40px;margin-bottom:8px}
@@ -137,6 +138,7 @@ footer{color:var(--dim);font-size:11.5px;text-align:center;padding:8px 16px 20px
       <button data-seg="liked" class="on">👍 Liked</button>
       <button data-seg="seen">👁 Seen</button>
       <button data-seg="disliked">👎 Disliked</button>
+      <button data-seg="pass">⏭ Passed</button>
     </div>
     <div id="mine"></div>
   </section>
@@ -208,7 +210,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp
 const KNOWN = {};                     // every show object we've rendered, by id
 const PROV = {};                      // provider cache (memory)
 const OPEN = {};                      // ids with "where to watch" open
-const LABEL = { liked: 'Liked', seen: 'Seen', disliked: 'Disliked', watch: 'Watchlist' };
+const LABEL = { liked: 'Liked', seen: 'Seen', disliked: 'Disliked', watch: 'Watchlist', pass: 'Passed' };
 function slim(r) {
   return { id: r.id, name: r.name || r.original_name || 'Untitled', poster: r.poster_path || r.poster || '',
     year: r.year || (r.first_air_date || '').slice(0, 4), g: r.genre_ids || r.g || (r.genres || []).map(x => x.id),
@@ -302,7 +304,7 @@ async function fetchMissing() {
   byStatus('disliked').forEach(x => need(x, 1));
   if (!jobs.length) return;
   await pool(jobs, j => getRecs(j[0], j[1]), 6);
-  Object.keys(RECS).forEach(id => { if (!S.shows[id] || S.shows[id].s === 'watch') delete RECS[id]; });
+  Object.keys(RECS).forEach(id => { if (!S.shows[id] || S.shows[id].s === 'watch' || S.shows[id].s === 'pass') delete RECS[id]; });
   saveRecs();
 }
 async function fetchExtra() {
@@ -365,9 +367,10 @@ function cardHTML(x, why) {
     '</div>' +
     (OPEN[x.id] ? '<div class="prov">' + provHTML(x.id) + '</div>' : '') +
     '<div class="acts">' +
-      '<button data-act="set" data-s="liked"' + on('liked') + '>👍 Liked it</button>' +
-      '<button data-act="set" data-s="seen"' + on('seen') + '>👁 Seen it</button>' +
+      '<button data-act="set" data-s="liked"' + on('liked') + '>👍 Liked</button>' +
+      '<button data-act="set" data-s="seen"' + on('seen') + '>👁 Seen</button>' +
       '<button data-act="set" data-s="disliked"' + on('disliked') + '>👎 Disliked</button>' +
+      '<button data-act="set" data-s="pass"' + on('pass') + '>⏭ Pass</button>' +
     '</div></article>';
 }
 function provHTML(id) {
@@ -419,7 +422,7 @@ function renderPicks() {
   for (let i = 0; i < poolList.length && shown.length < showLimit; i++)
     if (shown.indexOf(poolList[i].show.id) < 0) shown.push(poolList[i].show.id);
   note.innerHTML = liked ? '' :
-    '<div class="note"><b>Start here:</b> these are popular right now. Tap 👍, 👁 or 👎 on any you\'ve seen, or use <b>Add</b> to search your favorites. Picks get personal after your first 👍.</div>';
+    '<div class="note"><b>Start here:</b> these are popular right now. Tap 👍, 👁 or 👎 on any you\'ve seen, ⏭ Pass on ones you\'re not interested in, or use <b>Add</b> to search your favorites. Picks get personal after your first 👍.</div>';
   if (!shown.length) {
     more.innerHTML = '';
     box.innerHTML = loadingRecs ? '<div class="spin">Finding shows for you…</div>'
@@ -446,7 +449,8 @@ function renderLists() {
   $('mine').innerHTML = listHTML(mineSeg, {
     liked: '<big>👍</big>No liked shows yet. Use <b>Add</b> to search for your favorites.',
     seen: '<big>👁</big>Shows you\'ve seen but felt so-so about go here.',
-    disliked: '<big>👎</big>Shows you didn\'t like go here, so they\'re never suggested.' }[mineSeg]);
+    disliked: '<big>👎</big>Shows you didn\'t like go here, so they\'re never suggested.',
+    pass: '<big>⏭</big>Suggestions you pass on go here. They won\'t be suggested again and don\'t affect your picks.' }[mineSeg]);
   const n = byStatus('watch').length; $('nWatch').textContent = n || ''; $('nWatch').style.display = n ? '' : 'none';
   const c = st => byStatus(st).length;
   $('sub').textContent = c('liked') + ' liked · ' + c('seen') + ' seen · ' + c('disliked') + ' disliked';
