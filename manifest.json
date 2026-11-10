@@ -1,0 +1,9 @@
+{
+  "name": "What to Watch",
+  "short_name": "What to Watch",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0e1016",
+  "theme_color": "#0e1016",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
+}

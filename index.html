@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>What to Watch</title>
+<meta name="theme-color" content="#0e1016">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="What to Watch">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<style>
+:root{
+  --bg:#0e1016; --panel:#171a23; --panel2:#1f2330; --line:#2a2f3e;
+  --text:#eef0f6; --dim:#9aa1b5; --accent:#f5b83d; --accent-ink:#1a1300;
+  --good:#4cc38a; --bad:#ef6b6b; --seen:#6ea8fe; --watch:#c58bf2;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{padding:env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom)) 0;min-height:100vh}
+header{position:sticky;top:0;z-index:5;background:rgba(14,16,22,.94);backdrop-filter:blur(10px);
+  padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:20px;letter-spacing:.2px}
+header h1 span{color:var(--accent)}
+header p{margin:2px 0 0;color:var(--dim);font-size:13px}
+main{max-width:720px;margin:0 auto;padding:12px}
+.view{display:none}.view.on{display:block}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;background:#12141c;
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;color:var(--dim);padding:9px 2px 8px;font-size:11px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+nav button i{font-style:normal;font-size:20px;line-height:1.1}
+nav button.on{color:var(--accent)}
+nav .badge{font-size:10px;background:var(--panel2);border-radius:9px;padding:0 6px;color:var(--text)}
+
+.card{display:grid;grid-template-columns:96px 1fr;gap:12px;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:12px;
+  animation:pop .22s ease}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card img.poster,.card .noposter{width:96px;height:144px;border-radius:9px;object-fit:cover;background:var(--panel2)}
+.card .noposter{display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--dim)}
+.card h3{margin:0;font-size:17px;line-height:1.2}
+.meta{color:var(--dim);font-size:13px;margin-top:3px}
+.meta b{color:var(--accent);font-weight:600}
+.why{font-size:12.5px;color:var(--accent);margin-top:4px}
+.ov{font-size:13.5px;color:#c9cede;margin-top:6px;display:-webkit-box;-webkit-line-clamp:3;
+  -webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.ov.open{-webkit-line-clamp:unset}
+.acts{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.acts button{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;
+  padding:9px 4px;font-size:13px;cursor:pointer}
+.acts button.on[data-s=liked]{background:var(--good);border-color:var(--good);color:#04130b;font-weight:600}
+.acts button.on[data-s=seen]{background:var(--seen);border-color:var(--seen);color:#04101f;font-weight:600}
+.acts button.on[data-s=disliked]{background:var(--bad);border-color:var(--bad);color:#1f0505;font-weight:600}
+.acts2{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.acts2 button{border-radius:10px;padding:10px 4px;font-size:14px;cursor:pointer;border:1px solid var(--line);
+  background:var(--panel2);color:var(--text)}
+.acts2 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.acts2 button.on[data-s=watch]{background:var(--watch);border-color:var(--watch);color:#17062a;font-weight:600}
+.prov{grid-column:1/-1;background:#11131a;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13.5px}
+.prov h4{margin:8px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
+.prov h4:first-child{margin-top:0}
+.plist{display:flex;flex-wrap:wrap;gap:8px}
+.pv{display:flex;align-items:center;gap:7px;background:var(--panel2);border-radius:9px;padding:5px 9px 5px 5px}
+.pv img{width:30px;height:30px;border-radius:7px}
+.prov a{color:var(--accent)}
+.prov small{display:block;color:var(--dim);margin-top:8px;font-size:11.5px}
+
+.bar{display:flex;gap:8px;margin-bottom:12px}
+input[type=text],input[type=search],textarea,select{width:100%;background:var(--panel);color:var(--text);
+  border:1px solid var(--line);border-radius:11px;padding:12px;font-size:16px;font-family:inherit}
+textarea{min-height:90px;font-size:12px}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:11px;padding:12px 16px;
+  font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line);font-weight:500}
+.btn.wide{width:100%;margin-top:8px}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;background:none;border:0;color:var(--dim);padding:9px 2px;border-radius:8px;font-size:13.5px;cursor:pointer}
+.seg button.on{background:var(--panel2);color:var(--text);font-weight:600}
+.empty{text-align:center;color:var(--dim);padding:36px 18px;font-size:15px}
+.empty big{display:block;font-size:40px;margin-bottom:8px}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14px;
+  color:#c9cede;margin-bottom:12px}
+.note b{color:var(--text)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.box h2{margin:0 0 6px;font-size:16px}
+.box p,.box li{font-size:14px;color:#c9cede}
+.box ol{padding-left:20px;margin:6px 0 10px}
+.box a{color:var(--accent)}
+.box label{display:block;font-size:13px;color:var(--dim);margin:10px 0 5px}
+.msg{font-size:13.5px;margin-top:8px;min-height:18px}
+.msg.err{color:var(--bad)}.msg.ok{color:var(--good)}
+.spin{text-align:center;color:var(--dim);padding:18px;font-size:14px}
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+  background:#2a2f3e;color:var(--text);border-radius:22px;padding:9px 8px 9px 16px;font-size:14px;z-index:9;
+  display:flex;align-items:center;gap:10px;opacity:0;pointer-events:none;transition:.2s;max-width:92vw;
+  box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#toast.on{opacity:1;transform:translateX(-50%);pointer-events:auto}
+#toast span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toast button{background:var(--accent);color:var(--accent-ink);border:0;border-radius:16px;padding:6px 12px;font-weight:700;font-size:13px}
+footer{color:var(--dim);font-size:11.5px;text-align:center;padding:8px 16px 20px}
+</style>
+</head>
+<body>
+<header>
+  <h1>What to <span>Watch</span></h1>
+  <p id="sub">Rate shows. Get better picks.</p>
+</header>
+
+<main>
+  <!-- PICKS -->
+  <section class="view" id="v-picks">
+    <div id="picksNote"></div>
+    <div id="picks"></div>
+    <div id="picksMore"></div>
+  </section>
+
+  <!-- ADD -->
+  <section class="view" id="v-add">
+    <form class="bar" id="searchForm">
+      <input type="search" id="q" placeholder="Search for a show you've seen…" autocomplete="off" enterkeyhint="search">
+      <button class="btn" type="submit">Search</button>
+    </form>
+    <div id="results"><div class="empty"><big>🔎</big>Search a show, then tap Liked, Seen or Disliked.<br>The more you rate, the better your picks.</div></div>
+  </section>
+
+  <!-- WATCHLIST -->
+  <section class="view" id="v-watch"><div id="watchlist"></div></section>
+
+  <!-- MY SHOWS -->
+  <section class="view" id="v-mine">
+    <div class="seg" id="mineSeg">
+      <button data-seg="liked" class="on">👍 Liked</button>
+      <button data-seg="seen">👁 Seen</button>
+      <button data-seg="disliked">👎 Disliked</button>
+    </div>
+    <div id="mine"></div>
+  </section>
+
+  <!-- SETTINGS / SETUP -->
+  <section class="view" id="v-set">
+    <div class="box">
+      <h2>Show data key (one-time setup)</h2>
+      <p>Show info, suggestions and streaming availability come from TMDB, which is free but needs your own key:</p>
+      <ol>
+        <li>Create a free account at <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener">themoviedb.org</a>.</li>
+        <li>Open <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">Settings → API</a> and request a key (choose “Personal” use).</li>
+        <li>Copy the <b>API Key</b> and paste it here.</li>
+      </ol>
+      <input type="text" id="key" placeholder="Paste TMDB API key" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="btn wide" id="saveKey">Save key</button>
+      <div class="msg" id="keyMsg"></div>
+    </div>
+    <div class="box">
+      <h2>Streaming country</h2>
+      <p>Which country's streaming services to show.</p>
+      <select id="region">
+        <option value="US">United States</option><option value="CA">Canada</option>
+        <option value="GB">United Kingdom</option><option value="AU">Australia</option>
+        <option value="MX">Mexico</option><option value="DE">Germany</option>
+        <option value="FR">France</option><option value="ES">Spain</option>
+      </select>
+    </div>
+    <div class="box">
+      <h2>Backup</h2>
+      <p>Your lists are saved on this device only. Copy a backup to keep them safe or move them to another device.</p>
+      <button class="btn ghost wide" id="copyBackup">Copy backup</button>
+      <label for="restoreText">Restore: paste a backup below</label>
+      <textarea id="restoreText" placeholder="Paste backup here"></textarea>
+      <button class="btn ghost wide" id="restore">Restore from backup</button>
+      <div class="msg" id="backupMsg"></div>
+    </div>
+    <footer>This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability provided by JustWatch.</footer>
+  </section>
+</main>
+
+<nav id="nav">
+  <button data-view="picks"><i>✨</i>For You</button>
+  <button data-view="add"><i>＋</i>Add</button>
+  <button data-view="watch"><i>📺</i>Watchlist <span class="badge" id="nWatch"></span></button>
+  <button data-view="mine"><i>⭐</i>My Shows</button>
+  <button data-view="set"><i>⚙️</i>Settings</button>
+</nav>
+
+<div id="toast"><span id="toastText"></span><button id="toastUndo">Undo</button></div>
+
+<script>
+'use strict';
+/* ---------- storage ---------- */
+const LS = 'tvseries.v1', LS_RECS = 'tvseries.recs.v1';
+const $ = id => document.getElementById(id);
+let S = { key: '', region: 'US', shows: {}, genres: {} };
+let RECS = {};                       // id -> {t, list}
+try { S = Object.assign(S, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
+try { RECS = JSON.parse(localStorage.getItem(LS_RECS) || '{}'); } catch (e) {}
+function save() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
+function saveRecs() {
+  try { localStorage.setItem(LS_RECS, JSON.stringify(RECS)); }
+  catch (e) { try { localStorage.removeItem(LS_RECS); } catch (e2) {} }
+}
+
+/* ---------- helpers ---------- */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KNOWN = {};                     // every show object we've rendered, by id
+const PROV = {};                      // provider cache (memory)
+const OPEN = {};                      // ids with "where to watch" open
+const LABEL = { liked: 'Liked', seen: 'Seen', disliked: 'Disliked', watch: 'Watchlist' };
+function slim(r) {
+  return { id: r.id, name: r.name || r.original_name || 'Untitled', poster: r.poster_path || r.poster || '',
+    year: r.year || (r.first_air_date || '').slice(0, 4), g: r.genre_ids || r.g || (r.genres || []).map(x => x.id),
+    v: r.vote_average != null ? r.vote_average : (r.v || 0), vc: r.vote_count != null ? r.vote_count : (r.vc || 0),
+    ov: (r.overview || r.ov || '').slice(0, 320) };
+}
+function byStatus(st) {
+  return Object.values(S.shows).filter(x => x.s === st).sort((a, b) => (b.t || 0) - (a.t || 0));
+}
+
+/* ---------- TMDB ---------- */
+async function api(path, params) {
+  const u = new URL('https://api.themoviedb.org/3' + path);
+  const p = Object.assign({ language: 'en-US' }, params || {});
+  const opt = {};
+  if (S.key.length > 40) opt.headers = { Authorization: 'Bearer ' + S.key };   // v4 token also works
+  else p.api_key = S.key;
+  Object.keys(p).forEach(k => u.searchParams.set(k, p[k]));
+  const r = await fetch(u, opt);
+  if (r.status === 401) throw new Error('badkey');
+  if (!r.ok) throw new Error('http' + r.status);
+  return r.json();
+}
+async function pool(items, fn, n) {           // run fn over items, n at a time
+  let i = 0;
+  const work = async () => { while (i < items.length) { const it = items[i++]; try { await fn(it); } catch (e) {} } };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, work));
+}
+const WEEK = 7 * 864e5;
+async function getRecs(id, pages) {
+  const c = RECS[id];
+  if (c && Date.now() - c.t < WEEK && (c.p || 1) >= pages) return c.list;
+  let list = [];
+  for (let pg = 1; pg <= pages; pg++) {
+    const d = await api('/tv/' + id + '/recommendations', { page: pg });
+    list = list.concat((d.results || []).map(slim));
+    if (pg >= (d.total_pages || 1)) break;
+  }
+  RECS[id] = { t: Date.now(), p: pages, list };
+  return list;
+}
+
+/* ---------- recommendation engine ---------- */
+let EXTRA = [];                        // discover / trending fallbacks (memory)
+let discPage = 0, loadingRecs = false, shown = [], showLimit = 10;
+
+function genreAffinity() {
+  const aff = {}; let n = 0;
+  Object.values(S.shows).forEach(x => {
+    const w = x.s === 'liked' ? 1 : x.s === 'disliked' ? -1 : x.s === 'seen' ? 0.25 : 0;
+    if (!w) return; if (x.s === 'liked') n++;
+    (x.g || []).forEach(g => aff[g] = (aff[g] || 0) + w);
+  });
+  Object.keys(aff).forEach(g => aff[g] /= Math.max(n, 1));
+  return aff;
+}
+function buildPool() {
+  const aff = genreAffinity(), cand = {};
+  const add = (src, weight) => {
+    const c = RECS[src.id]; if (!c) return;
+    const n = c.list.length;
+    c.list.forEach((r, i) => {
+      if (S.shows[r.id]) return;
+      const e = cand[r.id] || (cand[r.id] = { show: r, score: 0, why: [] });
+      const pts = weight * (1 - i / (n * 1.25));
+      e.score += pts;
+      if (weight === 1) e.why.push([pts, src.name]);
+    });
+  };
+  byStatus('liked').forEach(x => add(x, 1));
+  byStatus('seen').forEach(x => add(x, 0.35));
+  byStatus('disliked').forEach(x => {
+    const c = RECS[x.id]; if (!c) return;
+    c.list.forEach((r, i) => { if (cand[r.id]) cand[r.id].score -= 0.8 * (1 - i / (c.list.length * 1.25)); });
+  });
+  EXTRA.forEach(r => { if (!S.shows[r.id] && !cand[r.id]) cand[r.id] = { show: r, score: 0.15, why: [], extra: true }; });
+  return Object.values(cand).map(e => {
+    const g = e.show.g || [];
+    if (g.length) e.score += 0.5 * g.reduce((a, x) => a + (aff[x] || 0), 0) / g.length;
+    if (e.show.vc >= 50) e.score += (e.show.v - 6.5) * 0.12;
+    e.why.sort((a, b) => b[0] - a[0]);
+    return e;
+  }).filter(e => e.score > 0 && e.show.poster).sort((a, b) => b.score - a.score);
+}
+async function fetchMissing() {
+  if (!S.key) return;
+  const jobs = [];
+  const need = (x, p) => { const c = RECS[x.id]; if (!c || Date.now() - c.t > WEEK || (c.p || 1) < p) jobs.push([x.id, p]); };
+  byStatus('liked').forEach(x => need(x, 2));
+  byStatus('seen').forEach(x => need(x, 1));
+  byStatus('disliked').forEach(x => need(x, 1));
+  if (!jobs.length) return;
+  await pool(jobs, j => getRecs(j[0], j[1]), 6);
+  Object.keys(RECS).forEach(id => { if (!S.shows[id] || S.shows[id].s === 'watch') delete RECS[id]; });
+  saveRecs();
+}
+async function fetchExtra() {
+  // Nothing rated yet: popular shows to start rating. Otherwise: top shows in favourite genres.
+  const liked = byStatus('liked');
+  if (!liked.length) {
+    if (discPage > 3) return;
+    discPage++;
+    const d = await api('/trending/tv/week', { page: discPage });
+    EXTRA = EXTRA.concat((d.results || []).map(slim));
+    return;
+  }
+  const aff = genreAffinity();
+  const top = Object.keys(aff).filter(g => aff[g] > 0).sort((a, b) => aff[b] - aff[a]).slice(0, 2);
+  if (!top.length || discPage > 15) return;
+  discPage++;
+  const d = await api('/discover/tv', { with_genres: top.join(','), sort_by: 'vote_average.desc',
+    'vote_count.gte': 300, page: discPage });
+  EXTRA = EXTRA.concat((d.results || []).map(slim));
+}
+async function refreshPicks(reset) {
+  if (!S.key) return renderPicks();
+  if (reset) { shown = []; showLimit = 10; }
+  if (loadingRecs) return;
+  loadingRecs = true; renderPicks();
+  try {
+    await fetchMissing();
+    let tries = 0;
+    while (buildPool().length < showLimit + 4 && tries++ < 3) {
+      const before = EXTRA.length;
+      await fetchExtra();
+      if (EXTRA.length === before) break;
+    }
+    loadingRecs = false; renderPicks();
+  } catch (e) {
+    loadingRecs = false;
+    $('picks').innerHTML = '<div class="empty"><big>⚠️</big>' + (e.message === 'badkey'
+      ? 'Your TMDB key was rejected. Check it in Settings.' : 'Couldn\'t load suggestions. Check your connection and try again.') +
+      '</div><button class="btn wide" data-act="refresh">Try again</button>';
+  }
+}
+
+/* ---------- rendering ---------- */
+function genreNames(g) { return (g || []).map(x => S.genres[x]).filter(Boolean).slice(0, 3).join(' · '); }
+function cardHTML(x, why) {
+  KNOWN[x.id] = x;
+  const st = (S.shows[x.id] || {}).s;
+  const on = s => st === s ? ' class="on"' : '';
+  const poster = x.poster
+    ? '<img class="poster" loading="lazy" alt="" src="https://image.tmdb.org/t/p/w185' + esc(x.poster) + '">'
+    : '<div class="noposter">📺</div>';
+  const meta = [x.year, x.vc >= 20 ? '<b>★ ' + (+x.v).toFixed(1) + '</b>' : '', esc(genreNames(x.g))].filter(Boolean).join(' · ');
+  return '<article class="card" data-id="' + x.id + '">' + poster + '<div>' +
+    '<h3>' + esc(x.name) + '</h3><div class="meta">' + meta + '</div>' +
+    (why ? '<div class="why">' + esc(why) + '</div>' : '') +
+    (x.ov ? '<div class="ov" data-act="ov">' + esc(x.ov) + '</div>' : '') + '</div>' +
+    '<div class="acts2">' +
+      '<button class="primary" data-act="where">' + (OPEN[x.id] ? 'Hide' : '▶ Where to watch') + '</button>' +
+      '<button data-act="set" data-s="watch"' + on('watch') + '>' + (st === 'watch' ? '✓ On watchlist' : '＋ Watchlist') + '</button>' +
+    '</div>' +
+    (OPEN[x.id] ? '<div class="prov">' + provHTML(x.id) + '</div>' : '') +
+    '<div class="acts">' +
+      '<button data-act="set" data-s="liked"' + on('liked') + '>👍 Liked it</button>' +
+      '<button data-act="set" data-s="seen"' + on('seen') + '>👁 Seen it</button>' +
+      '<button data-act="set" data-s="disliked"' + on('disliked') + '>👎 Disliked</button>' +
+    '</div></article>';
+}
+function provHTML(id) {
+  const p = PROV[id];
+  if (!p) return '<div class="spin">Checking streaming services…</div>';
+  if (p.err) return 'Couldn\'t check streaming right now. Tap “Where to watch” to try again.';
+  const r = p[S.region];
+  const grp = (title, arr) => arr && arr.length
+    ? '<h4>' + title + '</h4><div class="plist">' + arr.map(v => '<span class="pv">' +
+      (v.logo_path ? '<img alt="" src="https://image.tmdb.org/t/p/w92' + esc(v.logo_path) + '">' : '') +
+      esc(v.provider_name) + '</span>').join('') + '</div>' : '';
+  if (!r) return 'Not available on any streaming service in ' + esc(S.region) + ' right now.<small>Source: JustWatch</small>';
+  const seenIds = {}, rentBuy = [];
+  (r.rent || []).concat(r.buy || []).forEach(v => { if (!seenIds[v.provider_id]) { seenIds[v.provider_id] = 1; rentBuy.push(v); } });
+  const html = grp('Stream with subscription', r.flatrate) + grp('Free', r.free) + grp('Free with ads', r.ads) + grp('Rent or buy', rentBuy);
+  return (html || 'Not available on any streaming service in ' + esc(S.region) + ' right now.') +
+    (r.link ? '<small><a href="' + esc(r.link) + '" target="_blank" rel="noopener">Open watch links</a> · Source: JustWatch</small>' : '<small>Source: JustWatch</small>');
+}
+async function toggleWhere(id) {
+  if (OPEN[id]) { delete OPEN[id]; return rerenderCard(id); }
+  OPEN[id] = 1; rerenderCard(id);
+  if (!PROV[id] || PROV[id].err) {
+    try { PROV[id] = (await api('/tv/' + id + '/watch/providers')).results || {}; }
+    catch (e) { PROV[id] = { err: 1 }; }
+    rerenderCard(id);
+  }
+}
+function rerenderCard(id) {
+  document.querySelectorAll('.card[data-id="' + id + '"]').forEach(el => {
+    const why = el.querySelector('.why');
+    const t = document.createElement('div');
+    t.innerHTML = cardHTML(KNOWN[id], why ? why.textContent : '');
+    t.firstChild.style.animation = 'none';
+    el.replaceWith(t.firstChild);
+  });
+}
+function renderPicks() {
+  const note = $('picksNote'), box = $('picks'), more = $('picksMore');
+  if (!S.key) {
+    note.innerHTML = ''; more.innerHTML = '';
+    box.innerHTML = '<div class="empty"><big>🔑</big>One quick step first: add your free show-data key.</div>' +
+      '<button class="btn wide" data-act="goset">Set it up</button>';
+    return;
+  }
+  const liked = byStatus('liked').length;
+  const poolList = buildPool(), map = {};
+  poolList.forEach(e => map[e.show.id] = e);
+  shown = shown.filter(id => map[id]);
+  for (let i = 0; i < poolList.length && shown.length < showLimit; i++)
+    if (shown.indexOf(poolList[i].show.id) < 0) shown.push(poolList[i].show.id);
+  note.innerHTML = liked ? '' :
+    '<div class="note"><b>Start here:</b> these are popular right now. Tap 👍, 👁 or 👎 on any you\'ve seen, or use <b>Add</b> to search your favorites. Picks get personal after your first 👍.</div>';
+  if (!shown.length) {
+    more.innerHTML = '';
+    box.innerHTML = loadingRecs ? '<div class="spin">Finding shows for you…</div>'
+      : '<div class="empty"><big>🍿</big>No more suggestions right now. Rate a few more shows in <b>Add</b> to unlock more.</div>';
+    return;
+  }
+  box.innerHTML = shown.map(id => {
+    const e = map[id];
+    const why = e.why.length ? 'Because you liked ' + e.why.slice(0, 2).map(w => w[1]).join(' & ')
+      : (e.extra && liked ? 'Top rated in genres you like' : '');
+    return cardHTML(e.show, why);
+  }).join('');
+  more.innerHTML = loadingRecs ? '<div class="spin">Finding more…</div>'
+    : '<button class="btn ghost wide" data-act="more">Show more suggestions</button>' +
+      '<button class="btn ghost wide" data-act="refresh">Reshuffle picks</button>';
+}
+function listHTML(st, emptyMsg) {
+  const a = byStatus(st);
+  return a.length ? a.map(x => cardHTML(x)).join('') : '<div class="empty">' + emptyMsg + '</div>';
+}
+let mineSeg = 'liked', view = 'picks', lastResults = [];
+function renderLists() {
+  $('watchlist').innerHTML = listHTML('watch', '<big>📺</big>Nothing on your watchlist yet.<br>Tap “＋ Watchlist” on a suggestion you want to watch.');
+  $('mine').innerHTML = listHTML(mineSeg, {
+    liked: '<big>👍</big>No liked shows yet. Use <b>Add</b> to search for your favorites.',
+    seen: '<big>👁</big>Shows you\'ve seen but felt so-so about go here.',
+    disliked: '<big>👎</big>Shows you didn\'t like go here, so they\'re never suggested.' }[mineSeg]);
+  const n = byStatus('watch').length; $('nWatch').textContent = n || ''; $('nWatch').style.display = n ? '' : 'none';
+  const c = st => byStatus(st).length;
+  $('sub').textContent = c('liked') + ' liked · ' + c('seen') + ' seen · ' + c('disliked') + ' disliked';
+}
+function renderResults() {
+  if (lastResults.length) $('results').innerHTML = lastResults.map(x => cardHTML(x)).join('');
+}
+function go(v) {
+  view = v;
+  document.querySelectorAll('.view').forEach(el => el.classList.toggle('on', el.id === 'v-' + v));
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+  window.scrollTo(0, 0);
+  if (v === 'picks') refreshPicks(); else renderLists();
+  if (v === 'add') renderResults();
+}
+
+/* ---------- actions ---------- */
+let undo = null, toastTimer = 0;
+function toast(text, undoFn) {
+  undo = undoFn || null;
+  $('toastText').textContent = text; $('toastUndo').style.display = undo ? '' : 'none';
+  $('toast').classList.add('on'); clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').classList.remove('on'), 4000);
+}
+function afterChange(id) {
+  save(); renderLists();
+  if (view === 'picks') {
+    if (S.shows[id]) shown = shown.filter(x => x != id);
+    renderPicks(); refreshPicks();
+  } else if (view === 'add') rerenderCard(id);
+}
+function setStatus(id, st) {
+  const x = KNOWN[id]; if (!x) return;
+  const prev = S.shows[id] ? Object.assign({}, S.shows[id]) : null;
+  if (prev && prev.s === st) { delete S.shows[id]; toast('Removed “' + x.name + '” from ' + LABEL[st], restore); }
+  else { S.shows[id] = Object.assign(slim(x), { s: st, t: Date.now() }); toast('“' + x.name + '” → ' + LABEL[st], restore); }
+  function restore() { if (prev) S.shows[id] = prev; else delete S.shows[id]; afterChange(id); }
+  afterChange(id);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const card = b.closest('.card'), id = card ? +card.dataset.id : 0, act = b.dataset.act;
+  if (act === 'set') setStatus(id, b.dataset.s);
+  else if (act === 'where') toggleWhere(id);
+  else if (act === 'ov') b.classList.toggle('open');
+  else if (act === 'more') { showLimit += 10; refreshPicks(); }
+  else if (act === 'refresh') refreshPicks(true);
+  else if (act === 'goset') go('set');
+});
+$('toastUndo').onclick = () => { if (undo) undo(); undo = null; $('toast').classList.remove('on'); };
+$('nav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.view); });
+$('mineSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  mineSeg = b.dataset.seg;
+  document.querySelectorAll('#mineSeg button').forEach(x => x.classList.toggle('on', x === b));
+  renderLists();
+});
+$('searchForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const q = $('q').value.trim(); if (!q) return;
+  if (!S.key) return go('set');
+  $('q').blur();
+  $('results').innerHTML = '<div class="spin">Searching…</div>';
+  try {
+    const d = await api('/search/tv', { query: q });
+    lastResults = (d.results || []).map(slim).sort((a, b) => b.vc - a.vc).slice(0, 15);
+    $('results').innerHTML = lastResults.length ? lastResults.map(x => cardHTML(x)).join('')
+      : '<div class="empty"><big>🤷</big>No shows found for “' + esc(q) + '”.</div>';
+  } catch (err) {
+    $('results').innerHTML = '<div class="empty"><big>⚠️</big>' + (err.message === 'badkey'
+      ? 'Your TMDB key was rejected. Check it in Settings.' : 'Search failed. Check your connection.') + '</div>';
+  }
+});
+
+/* ---------- settings ---------- */
+async function loadGenres() {
+  const d = await api('/genre/tv/list');
+  S.genres = {}; (d.genres || []).forEach(g => S.genres[g.id] = g.name); save();
+}
+$('saveKey').onclick = async () => {
+  const m = $('keyMsg'), old = S.key;
+  S.key = $('key').value.trim();
+  if (!S.key) { m.className = 'msg err'; m.textContent = 'Paste your key first.'; S.key = old; return; }
+  m.className = 'msg'; m.textContent = 'Checking…';
+  try {
+    await loadGenres(); save();
+    m.className = 'msg ok'; m.textContent = 'Key saved. You\'re all set!';
+    setTimeout(() => go(Object.keys(S.shows).length ? 'picks' : 'add'), 700);
+  } catch (e) {
+    S.key = old;
+    m.className = 'msg err';
+    m.textContent = e.message === 'badkey' ? 'That key didn\'t work. Copy the “API Key” value and try again.'
+      : 'Couldn\'t reach TMDB. Check your connection and try again.';
+  }
+};
+$('region').onchange = () => { S.region = $('region').value; save(); };
+$('copyBackup').onclick = async () => {
+  const m = $('backupMsg'), txt = JSON.stringify({ app: 'tvseries', region: S.region, shows: S.shows });
+  try { await navigator.clipboard.writeText(txt); m.className = 'msg ok'; m.textContent = 'Backup copied. Paste it into Notes to keep it.'; }
+  catch (e) { $('restoreText').value = txt; $('restoreText').select(); m.className = 'msg'; m.textContent = 'Backup is in the box below. Select all and copy it.'; }
+};
+$('restore').onclick = () => {
+  const m = $('backupMsg');
+  try {
+    const d = JSON.parse($('restoreText').value);
+    if (!d || typeof d.shows !== 'object') throw 0;
+    Object.keys(d.shows).forEach(id => {
+      const x = d.shows[id];
+      if (x && x.id && LABEL[x.s]) S.shows[x.id] = Object.assign(slim(x), { s: x.s, t: x.t || Date.now() });
+    });
+    if (d.region) S.region = d.region;
+    save(); renderLists(); $('region').value = S.region; $('restoreText').value = '';
+    m.className = 'msg ok'; m.textContent = 'Restored ' + Object.keys(d.shows).length + ' shows.';
+  } catch (e) { m.className = 'msg err'; m.textContent = 'That doesn\'t look like a valid backup.'; }
+};
+
+/* ---------- start ---------- */
+$('key').value = S.key; $('region').value = S.region;
+Object.values(S.shows).forEach(x => KNOWN[x.id] = x);
+renderLists();
+if (S.key && !Object.keys(S.genres).length) loadGenres().then(() => { renderLists(); renderPicks(); }).catch(() => {});
+go(S.key ? 'picks' : 'set');
+</script>
+</body>
+</html>
