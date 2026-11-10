@@ -1,0 +1,8 @@
+name = "tvseries"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tvseries"
+database_id = "52b78d11-a8fc-4777-b231-ccf2415e54f5"

@@ -165,6 +165,21 @@ footer{color:var(--dim);font-size:11.5px;text-align:center;padding:8px 16px 20px
       <div class="msg" id="keyMsg"></div>
     </div>
     <div class="box">
+      <h2>Cloud backup</h2>
+      <div id="syncOffBox">
+        <p>Save your lists and key to your own database so they survive clearing your browser, and show up on your other devices. Pick a backup password you'll remember. Already have one? Enter it to bring everything back.</p>
+        <input type="text" id="code" placeholder="Backup password (6+ characters)" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button class="btn wide" id="syncOn">Turn on backup / Restore</button>
+      </div>
+      <div id="syncOnBox" style="display:none">
+        <p><b>Backup is on.</b> Every change is saved automatically. To restore after clearing your browser, or to use another device, enter this password here:</p>
+        <p><b id="codeShow"></b></p>
+        <button class="btn ghost wide" id="syncNow">Back up now</button>
+        <button class="btn ghost wide" id="syncOffBtn">Turn off on this device</button>
+      </div>
+      <div class="msg" id="syncMsg"></div>
+    </div>
+    <div class="box">
       <h2>Streaming country</h2>
       <p>Which country's streaming services to show.</p>
       <select id="region">
@@ -175,8 +190,8 @@ footer{color:var(--dim);font-size:11.5px;text-align:center;padding:8px 16px 20px
       </select>
     </div>
     <div class="box">
-      <h2>Backup</h2>
-      <p>Your lists are saved on this device only. Copy a backup to keep them safe or move them to another device.</p>
+      <h2>Manual backup</h2>
+      <p>Prefer a copy you keep yourself? Copy your lists as text and paste them into Notes.</p>
       <button class="btn ghost wide" id="copyBackup">Copy backup</button>
       <label for="restoreText">Restore: paste a backup below</label>
       <textarea id="restoreText" placeholder="Paste backup here"></textarea>
@@ -206,7 +221,8 @@ let S = { key: '', region: 'US', shows: {}, genres: {} };
 let RECS = {};                       // id -> {t, list}
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) {}
 try { RECS = JSON.parse(localStorage.getItem(LS_RECS) || '{}'); } catch (e) {}
-function save() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
+function saveLocal() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
+function save() { queuePush(); saveLocal(); }
 function saveRecs() {
   try { localStorage.setItem(LS_RECS, JSON.stringify(RECS)); }
   catch (e) { try { localStorage.removeItem(LS_RECS); } catch (e2) {} }
@@ -262,7 +278,7 @@ async function getRecs(id, pages) {
 
 /* ---------- recommendation engine ---------- */
 let EXTRA = [];                        // discover / trending fallbacks (memory)
-let discPage = 0, loadingRecs = false, shown = [], showLimit = 10;
+let discPage = 0, loadingRecs = false, again = false, shown = [], showLimit = 10;
 
 function genreAffinity() {
   const aff = {}; let n = 0;
@@ -335,8 +351,8 @@ async function fetchExtra() {
 async function refreshPicks(reset) {
   if (!S.key) return renderPicks();
   if (reset) { shown = []; showLimit = 10; }
-  if (loadingRecs) return;
-  loadingRecs = true; renderPicks();
+  if (loadingRecs) { again = true; return; }
+  loadingRecs = true; again = false; renderPicks();
   try {
     await fetchMissing();
     let tries = 0;
@@ -346,6 +362,7 @@ async function refreshPicks(reset) {
       if (EXTRA.length === before) break;
     }
     loadingRecs = false; renderPicks();
+    if (again) refreshPicks();
   } catch (e) {
     loadingRecs = false;
     $('picks').innerHTML = '<div class="empty"><big>⚠️</big>' + (e.message === 'badkey'
@@ -583,7 +600,86 @@ $('restore').onclick = () => {
   } catch (e) { m.className = 'msg err'; m.textContent = 'That doesn\'t look like a valid backup.'; }
 };
 
+/* ---------- cloud backup ---------- */
+const SYNC_URL = 'https://tvseries.kollinmeubanks.workers.dev/api/data';
+let pushTimer = 0;
+function queuePush() {
+  if (!S.code) return;
+  S.dirty = true; clearTimeout(pushTimer); pushTimer = setTimeout(push, 1500);
+}
+async function syncFetch(method, body) {
+  const r = await fetch(SYNC_URL, { method, body,
+    headers: { 'X-Backup-Code': S.code, 'Content-Type': 'application/json' } });
+  if (!r.ok) throw new Error('sync' + r.status);
+  return r.json();
+}
+function syncStatus(ok) {
+  const m = $('syncMsg'); if (!S.code) { m.textContent = ''; return; }
+  m.className = ok ? 'msg ok' : 'msg err';
+  m.textContent = ok ? 'Backed up ✓ ' + new Date(S.syncedAt || Date.now()).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+    : 'Couldn\'t reach the backup right now. It will retry on your next change.';
+}
+async function push() {
+  if (!S.code) return false;
+  try {
+    const d = await syncFetch('PUT', JSON.stringify({ key: S.key, region: S.region, shows: S.shows }));
+    S.syncedAt = d.updated; S.dirty = false; saveLocal(); syncStatus(true); return true;
+  } catch (e) { syncStatus(false); return false; }
+}
+function mergeShows(remote) {
+  Object.keys(remote || {}).forEach(id => {
+    const x = remote[id], m = x && S.shows[x.id];
+    if (x && x.id && LABEL[x.s] && (!m || (x.t || 0) > (m.t || 0)))
+      S.shows[x.id] = Object.assign(slim(x), { s: x.s, t: x.t || Date.now() });
+  });
+}
+async function pull(joining) {
+  if (!S.code) return;
+  let d;
+  try { d = await syncFetch('GET'); } catch (e) { syncStatus(false); throw e; }
+  if (!d.found) { if (!(await push())) throw new Error('sync'); return; }
+  if (joining || d.updated > (S.syncedAt || 0)) {
+    const rd = d.data || {}, mixed = joining || S.dirty;
+    if (!mixed) { S.shows = {}; if (rd.region) S.region = rd.region; }   // another device changed things: take its copy
+    mergeShows(rd.shows);
+    if (!S.key && rd.key) S.key = rd.key;
+    S.syncedAt = d.updated; saveLocal();
+    Object.values(S.shows).forEach(x => KNOWN[x.id] = x);
+    $('key').value = S.key; $('region').value = S.region;
+    renderLists(); if (view === 'picks') refreshPicks(true);
+    if (mixed) { if (!(await push()) && joining) throw new Error('sync'); return; }
+  } else if (S.dirty) { await push(); return; }
+  syncStatus(true);
+}
+function renderSync() {
+  $('syncOffBox').style.display = S.code ? 'none' : '';
+  $('syncOnBox').style.display = S.code ? '' : 'none';
+  $('codeShow').textContent = S.code || '';
+}
+$('syncOn').onclick = async () => {
+  const m = $('syncMsg'), c = $('code').value.trim();
+  if (c.length < 6) { m.className = 'msg err'; m.textContent = 'Use at least 6 characters.'; return; }
+  const hadKey = !!S.key;
+  S.code = c; m.className = 'msg'; m.textContent = 'Connecting…';
+  try {
+    await pull(true);
+    renderSync(); $('code').value = '';
+    if (S.key && !Object.keys(S.genres).length) { try { await loadGenres(); } catch (e) {} }
+    m.className = 'msg ok';
+    m.textContent = 'Backup is on. ' + Object.keys(S.shows).length + ' shows saved.';
+    if (!hadKey && S.key) setTimeout(() => go('picks'), 900);
+  } catch (e) {
+    S.code = ''; S.dirty = false; saveLocal(); renderSync();
+    m.className = 'msg err'; m.textContent = 'Couldn\'t reach the backup database. Check your connection and try again.';
+  }
+};
+$('syncNow').onclick = () => { $('syncMsg').className = 'msg'; $('syncMsg').textContent = 'Backing up…'; push(); };
+$('syncOffBtn').onclick = () => { S.code = ''; S.dirty = false; S.syncedAt = 0; saveLocal(); renderSync(); $('syncMsg').textContent = ''; };
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.code) pull().catch(() => {}); });
+
 /* ---------- start ---------- */
+renderSync();
+if (S.code) pull().catch(() => {});
 $('key').value = S.key; $('region').value = S.region;
 Object.values(S.shows).forEach(x => KNOWN[x.id] = x);
 renderLists();
