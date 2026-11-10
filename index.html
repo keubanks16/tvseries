@@ -80,6 +80,8 @@ textarea{min-height:90px;font-size:12px}
   font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap}
 .btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line);font-weight:500}
 .btn.wide{width:100%;margin-top:8px}
+.yr{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:14px;color:var(--dim)}
+.yr select{flex:1;padding:9px 8px;font-size:15px}
 .seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:3px;margin-bottom:12px}
 .seg button{flex:1;background:none;border:0;color:var(--dim);padding:9px 1px;border-radius:8px;font-size:12.5px;cursor:pointer;white-space:nowrap}
 .seg button.on{background:var(--panel2);color:var(--text);font-weight:600}
@@ -116,6 +118,12 @@ footer{color:var(--dim);font-size:11.5px;text-align:center;padding:8px 16px 20px
 <main>
   <!-- PICKS -->
   <section class="view" id="v-picks">
+    <div class="yr">
+      <span>Released</span>
+      <select id="yFrom" aria-label="From year"></select>
+      <span>to</span>
+      <select id="yTo" aria-label="To year"></select>
+    </div>
     <div id="picksNote"></div>
     <div id="picks"></div>
     <div id="picksMore"></div>
@@ -290,6 +298,16 @@ function genreAffinity() {
   Object.keys(aff).forEach(g => aff[g] /= Math.max(n, 1));
   return aff;
 }
+function inYears(x) {
+  if (!S.yFrom && !S.yTo) return true;
+  const y = +x.year; if (!y) return false;
+  return (!S.yFrom || y >= +S.yFrom) && (!S.yTo || y <= +S.yTo);
+}
+function dateParams(p) {
+  if (S.yFrom) p['first_air_date.gte'] = S.yFrom + '-01-01';
+  if (S.yTo) p['first_air_date.lte'] = S.yTo + '-12-31';
+  return p;
+}
 function buildPool() {
   const aff = genreAffinity(), cand = {};
   const add = (src, weight) => {
@@ -316,7 +334,7 @@ function buildPool() {
     if (e.show.vc >= 50) e.score += (e.show.v - 6.5) * 0.12;
     e.why.sort((a, b) => b[0] - a[0]);
     return e;
-  }).filter(e => e.score > 0 && e.show.poster).sort((a, b) => b.score - a.score);
+  }).filter(e => e.score > 0 && e.show.poster && inYears(e.show)).sort((a, b) => b.score - a.score);
 }
 async function fetchMissing() {
   if (!S.key) return;
@@ -334,9 +352,11 @@ async function fetchExtra() {
   // Nothing rated yet: popular shows to start rating. Otherwise: top shows in favourite genres.
   const liked = byStatus('liked');
   if (!liked.length) {
-    if (discPage > 3) return;
+    if (discPage > 5) return;
     discPage++;
-    const d = await api('/trending/tv/week', { page: discPage });
+    const d = (S.yFrom || S.yTo)
+      ? await api('/discover/tv', dateParams({ sort_by: 'popularity.desc', 'vote_count.gte': 100, page: discPage }))
+      : await api('/trending/tv/week', { page: discPage });
     EXTRA = EXTRA.concat((d.results || []).map(slim));
     return;
   }
@@ -344,8 +364,8 @@ async function fetchExtra() {
   const top = Object.keys(aff).filter(g => aff[g] > 0).sort((a, b) => aff[b] - aff[a]).slice(0, 2);
   if (!top.length || discPage > 15) return;
   discPage++;
-  const d = await api('/discover/tv', { with_genres: top.join(','), sort_by: 'vote_average.desc',
-    'vote_count.gte': 300, page: discPage });
+  const d = await api('/discover/tv', dateParams({ with_genres: top.join(','), sort_by: 'vote_average.desc',
+    'vote_count.gte': (S.yFrom || S.yTo) ? 100 : 300, page: discPage }));
   EXTRA = EXTRA.concat((d.results || []).map(slim));
 }
 async function refreshPicks(reset) {
@@ -356,7 +376,7 @@ async function refreshPicks(reset) {
   try {
     await fetchMissing();
     let tries = 0;
-    while (buildPool().length < showLimit + 4 && tries++ < 3) {
+    while (buildPool().length < showLimit + 4 && tries++ < ((S.yFrom || S.yTo) ? 6 : 3)) {
       const before = EXTRA.length;
       await fetchExtra();
       if (EXTRA.length === before) break;
@@ -451,7 +471,7 @@ function renderPicks() {
   if (!shown.length) {
     more.innerHTML = '';
     box.innerHTML = loadingRecs ? '<div class="spin">Finding shows for you…</div>'
-      : '<div class="empty"><big>🍿</big>No more suggestions right now. Rate a few more shows in <b>Add</b> to unlock more.</div>';
+      : '<div class="empty"><big>🍿</big>' + ((S.yFrom || S.yTo) ? 'No more suggestions for those years. Try widening the year range.' : 'No more suggestions right now. Rate a few more shows in <b>Add</b> to unlock more.') + '</div>';
     return;
   }
   box.innerHTML = shown.map(id => {
@@ -599,6 +619,22 @@ $('restore').onclick = () => {
     m.className = 'msg ok'; m.textContent = 'Restored ' + Object.keys(d.shows).length + ' shows.';
   } catch (e) { m.className = 'msg err'; m.textContent = 'That doesn\'t look like a valid backup.'; }
 };
+
+/* ---------- year filter ---------- */
+(function () {
+  let o = '';
+  for (let y = new Date().getFullYear(); y >= 1950; y--) o += '<option value="' + y + '">' + y + '</option>';
+  $('yFrom').innerHTML = '<option value="">Any year</option>' + o;
+  $('yTo').innerHTML = '<option value="">Now</option>' + o;
+  $('yFrom').value = S.yFrom || ''; $('yTo').value = S.yTo || '';
+  const change = () => {
+    let a = $('yFrom').value, b = $('yTo').value;
+    if (a && b && +a > +b) { const t = a; a = b; b = t; $('yFrom').value = a; $('yTo').value = b; }
+    S.yFrom = a; S.yTo = b; saveLocal();
+    EXTRA = []; discPage = 0; refreshPicks(true);
+  };
+  $('yFrom').onchange = change; $('yTo').onchange = change;
+})();
 
 /* ---------- cloud backup ---------- */
 const SYNC_URL = (location.hostname.endsWith('.workers.dev') ? '' : 'https://tvseries.kollinmeubanks.workers.dev') + '/api/data';
