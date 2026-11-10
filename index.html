@@ -601,7 +601,7 @@ $('restore').onclick = () => {
 };
 
 /* ---------- cloud backup ---------- */
-const SYNC_URL = 'https://tvseries.kollinmeubanks.workers.dev/api/data';
+const SYNC_URL = (location.hostname.endsWith('.workers.dev') ? '' : 'https://tvseries.kollinmeubanks.workers.dev') + '/api/data';
 let pushTimer = 0;
 function queuePush() {
   if (!S.code) return;

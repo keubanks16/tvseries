@@ -1,0 +1,6 @@
+.git
+.github
+.assetsignore
+worker
+node_modules
+*.md

@@ -18,7 +18,11 @@ export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const url = new URL(request.url);
-    if (url.pathname !== '/api/data') return new Response('What to Watch backup is running.', { headers: CORS });
+    if (url.pathname !== '/api/data') {
+      // Everything else is the app itself (index.html etc.), served from the repo's files.
+      if (env.ASSETS) return env.ASSETS.fetch(request);
+      return new Response('What to Watch backup is running.', { headers: CORS });
+    }
 
     const code = (request.headers.get('X-Backup-Code') || '').trim();
     if (code.length < 6 || code.length > 200) return json({ error: 'bad code' }, 400);
